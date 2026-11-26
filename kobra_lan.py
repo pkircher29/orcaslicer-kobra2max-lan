@@ -72,7 +72,7 @@ def ssh(command, payload=None):
         response.write_bytes(b'')
 
 
-GCODE_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\.gcode')
+GCODE_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9_. -]{0,95}\.gcode')
 
 
 def browse_exports():
@@ -92,6 +92,7 @@ def upload(name):
     if b'; printer_model = Anycubic Kobra 2 Max' not in payload.splitlines():
         raise ValueError('The export must use the Anycubic Kobra 2 Max profile.')
     digest = hashlib.sha256(payload).hexdigest()
+    name = name.replace(' ', '_')
     target = '/mnt/UDISK/' + name
     stage = '/mnt/UDISK/.orca-' + uuid.uuid4().hex + '.part'
     ssh(f'set -euC; trap "rm -f {stage}" EXIT; cat > {stage}; echo "{digest}  {stage}" | sha256sum -c -; ln {stage} {target}; echo "{digest}  {target}" | sha256sum -c -', payload)

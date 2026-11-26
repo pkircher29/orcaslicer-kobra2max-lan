@@ -17,7 +17,7 @@ Start with the [historical Anycubic Kobra 2 Series Tools mirror and its flashing
 
 ## Print
 
-1. Slice with the **Anycubic Kobra 2 Max** profile. Export to the folder shown in the Kobra tab, using a unique `.gcode` name (ASCII letters, digits, underscores, hyphens and dots). Click **Browse exports…**, select the filename, and click **Upload**. It refuses overwrites, checks SHA-256, and never starts a print.
+1. Slice with the **Anycubic Kobra 2 Max** profile. Export to the folder shown in the Kobra tab, using a unique `.gcode` name (ASCII letters, digits, spaces, underscores, hyphens and dots). Spaces become underscores in the printer's copy. Click **Browse exports…**, select the filename, and click **Upload**. It refuses overwrites, checks SHA-256, and never starts a print.
 2. Check the bed and filament in person, then use **Refresh screen**. Enable one tap at a time on the live screen: **Print → Local → exact filename → Print**. Confirm the preview filename before the final tap. Watch for heating and advancing progress; don't repeat a start whose result is uncertain. The original firmware sometimes displays a generic preview for Orca files even when it can print them.
 3. Check the first layer in person. Do not expose SSH to the internet, start unattended, or bypass any printer safety interlock.
 
