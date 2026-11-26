@@ -28,8 +28,8 @@ WSL = str(Path(os.environ.get('SystemRoot', r'C:\Windows')) / 'System32' / 'wsl.
 HELPER = '/tmp/chuck_orca_kobra_touch'
 PAGE = r'''<!doctype html><meta charset="utf-8"><style>
 body{font:16px system-ui;margin:24px;color-scheme:light dark} input,button{font:inherit;margin:4px;padding:6px} img{display:block;margin-top:12px;cursor:crosshair;border:1px solid gray} #status{white-space:pre-wrap}</style>
-<h2>Kobra 2 Max LAN</h2><p>Export G-code to <code id="folder"></code>. Enter its filename below, then upload.</p>
-<label>Filename <input id="name" placeholder="wall_mount.gcode"></label><button id="upload">Upload</button>
+<h2>Kobra 2 Max LAN</h2><p>Export G-code to <code id="folder"></code>, then browse for the file.</p>
+<button id="browse">Browse exports…</button><label>G-code <select id="name" disabled><option value="">No file selected</option></select></label><button id="upload" disabled>Upload</button>
 <p>On the live touchscreen: Print → Local → choose the uploaded file → Print.</p>
 <label><input id="ready" type="checkbox">I checked that the bed is clear and the printer is ready. Enable one touchscreen tap.</label>
 <div><button id="refresh">Refresh screen</button></div><img id="screen" width="272" height="480" hidden alt="Kobra touchscreen"><p id="status" role="status"></p>
@@ -37,10 +37,13 @@ body{font:16px system-ui;margin:24px;color-scheme:light dark} input,button{font:
 const el=(id)=>document.getElementById(id); let token=null;
 function send(m){el('status').textContent='Working…';window.orca.postMessage(m);}
 el('refresh').onclick=()=>send({action:'screen'});
+el('browse').onclick=()=>send({action:'browse'});
+el('name').onchange=()=>{el('upload').disabled=!el('name').value;};
 el('upload').onclick=()=>send({action:'upload',name:el('name').value});
 el('screen').onclick=(e)=>{if(!el('ready').checked || !token)return;el('ready').checked=false; const t=token;token=null;
 const r=e.currentTarget.getBoundingClientRect();send({action:'tap',x:Math.floor(272*(e.clientX-r.left)/r.width),y:Math.floor(480*(e.clientY-r.top)/r.height),token:t});};
 window.orca.onMessage((m)=>{if(typeof m==='string')m=JSON.parse(m);el('status').textContent=m.status||'';if(m.folder)el('folder').textContent=m.folder;
+if(Array.isArray(m.files)){const s=el('name'), previous=s.value;s.replaceChildren(new Option('Select a file…',''),...m.files.map(n=>new Option(n,n)));s.disabled=!m.files.length;s.value=m.files.includes(previous)?previous:(m.files.length===1?m.files[0]:'');s.onchange();}
 if(m.image){el('screen').src=m.image;el('screen').hidden=false;token=m.token;} else {token=null;}});
 send({action:'init'});</script>'''
 
@@ -69,8 +72,18 @@ def ssh(command, payload=None):
         response.write_bytes(b'')
 
 
+GCODE_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\.gcode')
+
+
+def browse_exports():
+    root = EXPORT.resolve()
+    return sorted((p.name for p in root.iterdir()
+                   if GCODE_NAME.fullmatch(p.name) and p.is_file()
+                   and p.resolve().parent == root), key=str.casefold)
+
+
 def upload(name):
-    if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\.gcode', name):
+    if not isinstance(name, str) or not GCODE_NAME.fullmatch(name):
         raise ValueError('Use a .gcode filename with letters, numbers, underscores, dots or hyphens.')
     source = (EXPORT / name).resolve()
     if source.parent != EXPORT.resolve() or not 0 < source.stat().st_size <= 64 * 1024 * 1024:
@@ -142,14 +155,18 @@ class KobraPage(orca.pages.PagesPluginCapabilityBase):
             m = json.loads(msg) if isinstance(msg, str) else msg
         except ValueError:
             return
-        if not isinstance(m, dict) or m.get('action') not in ('init','screen','upload','tap'):
+        if not isinstance(m, dict) or m.get('action') not in ('init','browse','screen','upload','tap'):
             return
         def work():
             with self.lock:
                 try:
                     action = m['action']
                     if action == 'init':
-                        self.post_message({'folder':str(EXPORT),'status':'Ready. Refresh for live touchscreen.'})
+                        self.post_message({'folder':str(EXPORT),'status':'Browse for an export or refresh the touchscreen.'})
+                        return
+                    if action == 'browse':
+                        files = browse_exports()
+                        self.post_message({'files':files,'status':'Choose a file, then click Upload.' if files else 'No compatible filenames in the export folder yet.'})
                         return
                     if action == 'upload':
                         text = upload(m.get('name'))

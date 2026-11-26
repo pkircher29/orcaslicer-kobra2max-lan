@@ -32,6 +32,11 @@ with TemporaryDirectory() as tmp:
     assert (target/'kobra_lan.py').read_bytes() == (root/'kobra_lan.py').read_bytes()
     assert (support/'kobra_touch2.elf').read_bytes().startswith(b'\x7fELF')
     assert (support/'exports').is_dir()
+    for name in ('z.gcode', 'Lid.gcode', 'draft.stl', 'bad name.gcode'):
+        (support/'exports'/name).touch()
+    (support/'exports'/'folder.gcode').mkdir()
+    with patch.object(p,'EXPORT',support/'exports'):
+        assert p.browse_exports()==['Lid.gcode','z.gcode']
     sshdir = tmp/'.config/orca-kobra-lan'; sshdir.mkdir(parents=True)
     (sshdir/'address').write_text('192.168.100.123\n')
     for command,expected in [
